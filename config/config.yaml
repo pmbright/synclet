@@ -1,0 +1,37 @@
+# Synclet Configuration
+
+# Magento API Settings
+magento:
+  base_url: "https://www.bbwear.co.uk/onesaas_connect/index/index"
+  access_key: "aa26e14fc1a499c3757557a84f805e7d10b82339f3b00c1982b8350592a97de5"
+  action: "Orders"
+  page_size: 50  # Number of orders per page (API default is 50)
+  
+# MySQL Database Settings
+database:
+  host: "localhost"
+  port: 3306
+  database: "synclet_test"
+  user: "synclet_test"
+  password: "Bingo-Shrubbery-Crushing-428"
+  
+# Sync Settings
+sync:
+  initial_sync_date: "2025-07-01T07:41:16"
+  # Sync interval in minutes
+  interval_minutes: 15
+  # Number of retries on API failure
+  max_retries: 3
+  retry_delay_seconds: 30
+  
+# Logging Settings
+logging:
+  level: "INFO"
+  log_file: "logs/synclet.log"
+  max_size_mb: 10
+  backup_count: 5
+  
+# QuickBooks Settings (for future use)
+quickbooks:
+  enabled: false
+  # To be configured later
