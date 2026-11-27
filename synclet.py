@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Run one Magento-to-QuickBooks invoice sync, then exit (scheduled by cron)."""
+"""Sync Magento invoices to QuickBooks or preview/apply QuickBooks stock in Magento."""
 import argparse
 from datetime import datetime, timedelta
 import json
@@ -124,8 +124,15 @@ class Synclet:
 
 def main(argv=None):
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument('command', choices=['sync'], help='Run one scheduled invoice sync')
-    parser.parse_args(argv)
+    commands = parser.add_subparsers(dest='command', required=True)
+    commands.add_parser('sync', help='Run one scheduled invoice sync')
+    stock = commands.add_parser('stock-sync', help='Preview QuickBooks stock updates (no writes by default)')
+    stock.add_argument('--apply', action='store_true', help='Write stock quantities to Magento')
+    stock.add_argument('--sku', action='append', dest='skus', help='Limit to this SKU; may be repeated')
+    args = parser.parse_args(argv)
+    if args.command == 'stock-sync':
+        from stock_sync import run_stock_sync
+        return run_stock_sync(apply=args.apply, skus=args.skus)
     return 0 if Synclet().sync_orders() else 1
 
 

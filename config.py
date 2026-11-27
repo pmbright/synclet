@@ -29,3 +29,10 @@ QBO_CONFIG = {
     'adjustment_item_name': os.getenv('QBO_ADJUSTMENT_ITEM_NAME', 'Adjustment Item'),
     'customer_id': os.getenv('QBO_CUSTOMER_ID', '15990'),
 }
+
+# The invoice importer still uses the OneSaas connector. Stock uses Magento REST.
+STOCK_CONFIG = {
+    'rest_url': os.getenv('MAGENTO_REST_URL', 'https://www.bbwear.co.uk/rest/all/V1'),
+    'token_env': 'MAGENTO_ACCESS_TOKEN',
+    'report_dir': os.getenv('STOCK_REPORT_DIR', 'logs/stock-sync'),
+}
