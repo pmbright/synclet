@@ -1,6 +1,15 @@
 # Synclet - Magento to QuickBooks Order Sync Tool
 
-A Python-based tool to synchronize orders from Magento 2.4 to a local database, preparing them for later synchronization with QuickBooks Online.
+This is the original invoice-sync application, prepared as a source-only starting
+point. The new stock-sync application is not included. Both the root application
+and the older `src/` implementation are retained.
+
+Copy `.env.example` to `.env` and fill in your credentials before use. Existing
+QuickBooks tokens belong in the ignored `qbo_tokens.json` file. Logs, database
+dumps, caches, and local backup files are excluded from version control. Replace
+`CHANGE_ME_BEFORE_RUNNING` in `scripts/create_db.sql` before using that setup script.
+
+A Python-based tool to synchronize orders from Magento 2.4 to a local database and sync stock levels from QuickBooks Online to Magento.
 
 ## Features
 

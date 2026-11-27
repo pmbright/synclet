@@ -1,0 +1,46 @@
+# Local configuration and credentials
+.env
+.env.*
+!.env.example
+qbo_tokens.json
+qbo_tokens.json.*
+*.pem
+*.key
+
+# Python caches and local environments
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+env/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+*.egg-info/
+build/
+dist/
+
+# Generated data, logs, database backups and exports
+logs/
+*.log
+*.log.*
+mysql-dumps/
+exports/
+*.sql.gz
+*.sql.bz2
+*.sql.xz
+*.sqlite
+*.sqlite3
+
+# Local backups and editor/OS files
+*.bak
+*.old
+*.original
+*.new
+*.swp
+*~
+.DS_Store
+.idea/
+.vscode/

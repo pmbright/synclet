@@ -1,0 +1,37 @@
+Invoice No:  M<OrderNumber>
+Customer:  Magento - BBwear
+Invoice Date: <Date>
+Product/Service: <Item.ProductCode>
+Product/Service Description: <Item.ProductName>
+Product/Service Quantity: <Item.Quantity>
+Product/Service Amount: <Item.LineTotalIncTax>
+Product/Service Tax Code: <If Item.Taxes.TaxCode = "VAT - UK" then set this to: 20.0% S, otherwise set it to:  0.0% Z>
+Product/Service Tax Amount: Item.Taxes.TaxAmount
+Discount Amount: <Item.Discount>
+Discount Account: Discount given
+Apply Tax After Discount: true
+Payment method:  iwd_checkout_pay
+Payment Date: <Date>
+Payment Amount: <Payments.Amount>
+Payment Account: Paypal A/c
+Global Tax Calculation: TaxInclusive
+Email: <Contact.Email>
+Ship Method: Shipping
+Ship Via: <Shipping.ShippingMethod>
+Shipping Address Line 1: <Addresses.ShippingAddress.Salutation Addresses.ShippingAddress.FirstName Addresses.ShippingAddress.LastName> *If the salutation is blank or null then omit it.
+Shipping Address Line 2: <Addresses.ShippingAddress.Line1>
+Shipping Address Line 3: <Addresses.ShippingAddress.Line2>
+Shipping Address Country: <Addresses.ShippingAddress.Country>
+Shipping Address City: <Addresses.ShippingAddress.City>
+Shipping Address Postal Code: <Addresses.ShippingAddress.PostCode>
+Shipping Address Country Subdivision Code: <Addresses.ShippingAddress.State>
+Shipping Amount: <Shipping.Amount>
+Shipping Tax Code: <If Shipping.Amount is > 0 then set this to: 20.0% S, otherwise set it to:  0.0% Z>
+Billing Address Line 1: <Addresses.BillingAddress.Salutation Addresses.BillingAddress.FirstName Addresses.BillingAddress.LastName> *If the salutation is blank or null then omit it.
+Billing Address Line 2: <Addresses.BillingAddress.Line1>
+Billing Address Line 3: <Addresses.BillingAddress.Line2>
+Billing Address City: <Addresses.BillingAddress.City>
+Billing Address Country: <Addresses.BillingAddress.Country>
+Billing Address Postal Code: <Addresses.BillingAddress.PostCode>
+Billing Address Country Subdivision Code: <Addresses.BillingAddress.State>
+Memo: M<Magento Order Id>

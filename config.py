@@ -1,13 +1,18 @@
 import os
 from dotenv import load_dotenv
-from datetime import datetime
 
 # Load environment variables
 load_dotenv()
 
 # Magento API Configuration
-MAGENTO_BASE_URL = os.getenv('MAGENTO_BASE_URL', 'https://www.bbwear.co.uk/onesaas_connect/index/index')
-MAGENTO_ACCESS_KEY = os.getenv('MAGENTO_ACCESS_KEY', 'aa26e14fc1a499c3757557a84f805e7d10b82339f3b00c1982b8350592a97de5')
+MAGENTO_BASE_URL = os.getenv(
+    'MAGENTO_BASE_URL',
+    'https://www.bbwear.co.uk/onesaas_connect/index/index'
+)
+MAGENTO_ACCESS_KEY = os.getenv(
+    'MAGENTO_ACCESS_KEY',
+    ''
+)
 
 # Database Configuration
 DB_CONFIG = {
@@ -15,11 +20,36 @@ DB_CONFIG = {
     'port': int(os.getenv('DB_PORT', 3306)),
     'database': os.getenv('DB_NAME', 'synclet_test'),
     'user': os.getenv('DB_USER', 'synclet_test'),
-    'password': os.getenv('DB_PASSWORD', 'Bingo-Shrubbery-Crushing-428')
+    'password': os.getenv('DB_PASSWORD', '')
 }
 
-# Initial sync date
-INITIAL_SYNC_DATE = os.getenv('INITIAL_SYNC_DATE', '2025-07-01 07:41:16')
-
 # Page size for API requests
-PAGE_SIZE = 50
+PAGE_SIZE = int(os.getenv('PAGE_SIZE', 500))
+
+# CSV export configuration
+EXPORT_ON_SYNC = os.getenv('EXPORT_ON_SYNC', 'true').lower() == 'true'
+CSV_EXPORT_DIR = os.getenv('CSV_EXPORT_DIR', 'exports')
+CSV_EXPORT_SIMPLE = os.getenv('CSV_EXPORT_SIMPLE', 'true').lower() == 'true'
+CSV_EXPORT_COMPLETE_ONLY = os.getenv('CSV_EXPORT_COMPLETE_ONLY', 'false').lower() == 'true'
+CSV_EXPORT_TRACK = os.getenv('CSV_EXPORT_TRACK', 'true').lower() == 'true'
+
+
+
+QBO_CONFIG = {
+    "base_url": "https://quickbooks.api.intuit.com",
+    #"base_url": "https://sandbox-quickbooks.api.intuit.com",
+    #"realm_id": "123146494252114",
+    #"realm_id": "193514804510844",
+    
+    "vat_20_name": "20.0% S",
+    "vat_0_name": "0.0% Z",
+
+    "shipping_item_name": "Default Shipping Product",
+    "adjustment_item_name": "Adjustment Item",
+
+    ##"customer_id": "1970"
+    "customer_id": "15990"
+}
+
+QBO_DEBUG = True
+QBO_DRY_RUN = True

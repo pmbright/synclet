@@ -4,6 +4,13 @@ import json
 from datetime import datetime
 from config import DB_CONFIG
 
+def safe_float(value, default=0.0):
+    """Convert API numeric values safely; Magento may return null for numeric fields."""
+    if value is None or value == "":
+        return default
+    return float(value)
+
+
 class Database:
     def __init__(self):
         self.connection = None
@@ -81,6 +88,7 @@ class Database:
             tax_rate DECIMAL(5, 4),
             tax_amount DECIMAL(10, 4),
             line_total_inc_tax DECIMAL(10, 4),
+            discount DECIMAL(10, 4) DEFAULT 0,
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
             FOREIGN KEY (order_id) REFERENCES orders(id) ON DELETE CASCADE,
             INDEX idx_order_id (order_id)
@@ -142,6 +150,30 @@ class Database:
             print(f"Error creating tables: {e}")
             self.connection.rollback()
             
+    def _add_missing_columns(self):
+        """Add any missing columns to existing tables"""
+        try:
+            cursor = self.connection.cursor()
+            
+            # Check if discount column exists in order_items table
+            cursor.execute("""
+                SELECT COUNT(*) 
+                FROM information_schema.COLUMNS 
+                WHERE TABLE_SCHEMA = DATABASE() 
+                AND TABLE_NAME = 'order_items' 
+                AND COLUMN_NAME = 'discount'
+            """)
+            
+            if cursor.fetchone()[0] == 0:
+                # Add discount column if it doesn't exist
+                cursor.execute("ALTER TABLE order_items ADD COLUMN discount DECIMAL(10, 4) DEFAULT 0")
+                self.connection.commit()
+                print("Added discount column to order_items table")
+                
+        except Error as e:
+            # Ignore errors if table doesn't exist yet
+            pass
+            
     def get_last_sync_time(self):
         """Get the last successful sync time"""
         query = """
@@ -172,6 +204,12 @@ class Database:
         try:
             cursor = self.connection.cursor()
             
+            # Fix null shipping method in the raw JSON before processing
+            if 'Shipping' in order_data and order_data['Shipping'] is not None:
+                if order_data['Shipping'].get('ShippingMethod') is None:
+                    # Update the shipping method in the order data
+                    order_data['Shipping']['ShippingMethod'] = "Shipping and Collection - FREE UK SHIPPING for orders of £250 and over (Royal Mail Tracked 48)"
+            
             # Insert or update main order
             order_query = """
             INSERT INTO orders (
@@ -193,13 +231,13 @@ class Database:
             # Extract shipping info
             shipping = order_data.get('Shipping', {})
             shipping_method = shipping.get('ShippingMethod', '')
-            shipping_amount = float(shipping.get('Amount', 0))
-            shipping_tax = float(shipping.get('Taxes', {}).get('TaxAmount', 0))
+            shipping_amount = safe_float(shipping.get('Amount', 0))
+            shipping_tax = safe_float(shipping.get('Taxes', {}).get('TaxAmount', 0))
             
             # Extract payment info
             payment = order_data.get('Payments', {}).get('PaymentMethod', {})
             payment_method = payment.get('MethodName', '')
-            payment_amount = float(payment.get('Amount', 0))
+            payment_amount = safe_float(payment.get('Amount', 0))
             
             cursor.execute(order_query, (
                 int(order_data['Id']),
@@ -212,8 +250,8 @@ class Database:
                 order_data.get('CurrencyCode', 'GBP'),
                 order_data.get('Notes', ''),
                 order_data.get('Tags', ''),
-                float(order_data.get('Discounts', 0)),
-                float(order_data.get('Total', 0)),
+                safe_float(order_data.get('Discounts', 0)),
+                safe_float(order_data.get('Total', 0)),
                 shipping_method,
                 shipping_amount,
                 shipping_tax,
@@ -234,25 +272,26 @@ class Database:
                 item_query = """
                 INSERT INTO order_items (
                     order_id, product_id, product_code, product_name, quantity,
-                    price, unit_price_ex_tax, tax_rate, tax_amount, line_total_inc_tax
-                ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                    price, unit_price_ex_tax, tax_rate, tax_amount, line_total_inc_tax, discount
+                ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
                 """
                 
                 taxes = item.get('Taxes', {})
-                tax_rate = float(taxes.get('TaxRate', 0)) if taxes else 0
-                tax_amount = float(taxes.get('TaxAmount', 0)) if taxes else 0
+                tax_rate = safe_float(taxes.get('TaxRate', 0)) if taxes else 0
+                tax_amount = safe_float(taxes.get('TaxAmount', 0)) if taxes else 0
                 
                 cursor.execute(item_query, (
                     order_id,
                     item.get('ProductId', ''),
                     item.get('ProductCode', ''),
                     item.get('ProductName', ''),
-                    float(item.get('Quantity', 0)),
-                    float(item.get('Price', 0)),
-                    float(item.get('UnitPriceExTax', 0)),
+                    safe_float(item.get('Quantity', 0)),
+                    safe_float(item.get('Price', 0)),
+                    safe_float(item.get('UnitPriceExTax', 0)),
                     tax_rate,
                     tax_amount,
-                    float(item.get('LineTotalIncTax', 0))
+                    safe_float(item.get('LineTotalIncTax', 0)),
+                    safe_float(item.get('Discount', 0))
                 ))
             
             # Insert addresses
@@ -281,9 +320,9 @@ class Database:
                     order_id,
                     credit.get('entity_id', ''),
                     credit.get('store_id', ''),
-                    float(credit.get('adjustment_positive', 0)),
-                    float(credit.get('adjustment_negative', 0)),
-                    float(credit.get('grand_total', 0)),
+                    safe_float(credit.get('adjustment_positive', 0)),
+                    safe_float(credit.get('adjustment_negative', 0)),
+                    safe_float(credit.get('grand_total', 0)),
                     credit.get('increment_id', '')
                 ))
             
@@ -292,6 +331,12 @@ class Database:
             
         except Error as e:
             print(f"Error saving order {order_data.get('OrderNumber', 'Unknown')}: {e}")
+            self.connection.rollback()
+            return False
+        except Exception as e:
+            print(f"Error saving order {order_data.get('OrderNumber', 'Unknown')}: {e}")
+            print("[BAD ORDER JSON]")
+            print(json.dumps(order_data, indent=2))
             self.connection.rollback()
             return False
     
@@ -345,26 +390,260 @@ class Database:
             print(f"Error recording sync history: {e}")
     
     def clear_all_data(self):
-        """Clear all data from the database"""
+        """Drop all tables from the database"""
         try:
             cursor = self.connection.cursor()
             
             # Disable foreign key checks temporarily
             cursor.execute("SET FOREIGN_KEY_CHECKS = 0")
             
-            # Clear all tables
-            cursor.execute("TRUNCATE TABLE order_credits")
-            cursor.execute("TRUNCATE TABLE order_addresses")
-            cursor.execute("TRUNCATE TABLE order_items")
-            cursor.execute("TRUNCATE TABLE orders")
-            cursor.execute("TRUNCATE TABLE sync_history")
+            # Drop all tables
+            cursor.execute("DROP TABLE IF EXISTS csv_export_history")
+            cursor.execute("DROP TABLE IF EXISTS order_credits")
+            cursor.execute("DROP TABLE IF EXISTS order_addresses")
+            cursor.execute("DROP TABLE IF EXISTS order_items")
+            cursor.execute("DROP TABLE IF EXISTS orders")
+            cursor.execute("DROP TABLE IF EXISTS sync_history")
+            cursor.execute("DROP TABLE IF EXISTS stock_sync_history")
+            cursor.execute("DROP TABLE IF EXISTS product_mapping")
             
             # Re-enable foreign key checks
             cursor.execute("SET FOREIGN_KEY_CHECKS = 1")
             
             self.connection.commit()
-            print("All data cleared successfully")
+            print("All tables dropped successfully")
             
         except Error as e:
-            print(f"Error clearing data: {e}")
+            print(f"Error dropping tables: {e}")
             self.connection.rollback()
+    
+    def create_stock_sync_tables(self):
+        """Create tables for stock synchronization tracking"""
+        create_stock_sync_history = """
+        CREATE TABLE IF NOT EXISTS stock_sync_history (
+            id INT AUTO_INCREMENT PRIMARY KEY,
+            sync_time DATETIME NOT NULL,
+            products_synced INT DEFAULT 0,
+            success BOOLEAN DEFAULT TRUE,
+            error_message TEXT,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+        """
+        
+        create_product_mapping = """
+        CREATE TABLE IF NOT EXISTS product_mapping (
+            id INT AUTO_INCREMENT PRIMARY KEY,
+            qbo_item_id VARCHAR(50),
+            qbo_sku VARCHAR(100),
+            magento_product_code VARCHAR(100) UNIQUE,
+            last_sync_qty DECIMAL(10, 2),
+            last_sync_time DATETIME,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+            INDEX idx_qbo_sku (qbo_sku),
+            INDEX idx_magento_code (magento_product_code)
+        )
+        """
+        
+        create_csv_export_history = """
+        CREATE TABLE IF NOT EXISTS csv_export_history (
+            id INT AUTO_INCREMENT PRIMARY KEY,
+            order_id INT NOT NULL,
+            order_number VARCHAR(50) NOT NULL,
+            export_time DATETIME NOT NULL,
+            file_path VARCHAR(500),
+            export_type VARCHAR(20) DEFAULT 'full',
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY (order_id) REFERENCES orders(id) ON DELETE CASCADE,
+            UNIQUE KEY unique_order_export (order_id),
+            INDEX idx_order_number (order_number),
+            INDEX idx_export_time (export_time)
+        )
+        """
+        
+        try:
+            cursor = self.connection.cursor()
+            cursor.execute(create_stock_sync_history)
+            cursor.execute(create_product_mapping)
+            cursor.execute(create_csv_export_history)
+            self.connection.commit()
+            print("Stock sync and CSV export tables created successfully")
+            
+        except Error as e:
+            print(f"Error creating stock sync tables: {e}")
+            self.connection.rollback()
+    
+    def record_stock_sync(self, products_synced, success=True, error_message=None):
+        """Record stock sync history"""
+        query = """
+        INSERT INTO stock_sync_history (sync_time, products_synced, success, error_message)
+        VALUES (%s, %s, %s, %s)
+        """
+        
+        try:
+            cursor = self.connection.cursor()
+            cursor.execute(query, (
+                datetime.now(),
+                products_synced,
+                success,
+                error_message
+            ))
+            self.connection.commit()
+            
+        except Error as e:
+            print(f"Error recording stock sync history: {e}")
+    
+    def update_product_mapping(self, qbo_item_id, qbo_sku, magento_code, qty):
+        """Update or insert product mapping"""
+        query = """
+        INSERT INTO product_mapping (qbo_item_id, qbo_sku, magento_product_code, last_sync_qty, last_sync_time)
+        VALUES (%s, %s, %s, %s, %s)
+        ON DUPLICATE KEY UPDATE
+            qbo_item_id = VALUES(qbo_item_id),
+            qbo_sku = VALUES(qbo_sku),
+            last_sync_qty = VALUES(last_sync_qty),
+            last_sync_time = VALUES(last_sync_time)
+        """
+        
+        try:
+            cursor = self.connection.cursor()
+            cursor.execute(query, (
+                qbo_item_id,
+                qbo_sku,
+                magento_code,
+                qty,
+                datetime.now()
+            ))
+            self.connection.commit()
+            
+        except Error as e:
+            print(f"Error updating product mapping: {e}")
+    
+    def record_csv_export(self, order_id, order_number, file_path, export_type='full'):
+        """Record that an order has been exported to CSV"""
+        query = """
+        INSERT INTO csv_export_history (order_id, order_number, export_time, file_path, export_type)
+        VALUES (%s, %s, %s, %s, %s)
+        ON DUPLICATE KEY UPDATE
+            export_time = VALUES(export_time),
+            file_path = VALUES(file_path),
+            export_type = VALUES(export_type)
+        """
+        
+        try:
+            cursor = self.connection.cursor()
+            cursor.execute(query, (
+                order_id,
+                order_number,
+                datetime.now(),
+                file_path,
+                export_type
+            ))
+            self.connection.commit()
+            return True
+            
+        except Error as e:
+            print(f"Error recording CSV export: {e}")
+            self.connection.rollback()
+            return False
+    
+    def get_exported_order_ids(self):
+        """Get list of order IDs that have already been exported to CSV"""
+        query = """
+        SELECT DISTINCT order_id 
+        FROM csv_export_history
+        """
+        
+        try:
+            cursor = self.connection.cursor()
+            cursor.execute(query)
+            return [row[0] for row in cursor.fetchall()]
+            
+        except Error as e:
+            print(f"Error getting exported orders: {e}")
+            return []
+    
+    def is_order_exported(self, order_id):
+        """Check if a specific order has been exported"""
+        query = """
+        SELECT COUNT(*) 
+        FROM csv_export_history 
+        WHERE order_id = %s
+        """
+        
+        try:
+            cursor = self.connection.cursor()
+            cursor.execute(query, (order_id,))
+            result = cursor.fetchone()
+            return result[0] > 0
+            
+        except Error as e:
+            print(f"Error checking order export status: {e}")
+            return False
+    
+    def get_complete_orders_for_export(self):
+        """Get complete orders that haven't been exported yet"""
+        query = """
+        SELECT o.id, o.order_number, o.order_date, o.last_updated_date,
+               o.order_type, o.status, o.currency_code, o.notes, o.tags,
+               o.discounts, o.total, o.shipping_method, o.shipping_amount,
+               o.shipping_tax_amount, o.payment_method, o.payment_amount,
+               o.raw_json
+        FROM orders o
+        LEFT JOIN csv_export_history ceh ON o.id = ceh.order_id
+        WHERE o.status = 'complete' 
+        AND ceh.order_id IS NULL
+        ORDER BY o.order_date
+        """
+        
+        try:
+            cursor = self.connection.cursor(dictionary=True)
+            cursor.execute(query)
+            return cursor.fetchall()
+            
+        except Error as e:
+            print(f"Error getting orders for export: {e}")
+            return []
+    
+    def clear_csv_export_history(self):
+        """Clear CSV export history (for testing)"""
+        query = "TRUNCATE TABLE csv_export_history"
+        
+        try:
+            cursor = self.connection.cursor()
+            cursor.execute(query)
+            self.connection.commit()
+            print("CSV export history cleared")
+            
+        except Error as e:
+            print(f"Error clearing CSV export history: {e}")
+            self.connection.rollback()
+    
+    def drop_all_tables(self):
+        """Drop all tables - WARNING: This will delete everything!"""
+        try:
+            cursor = self.connection.cursor()
+            
+            # Disable foreign key checks
+            cursor.execute("SET FOREIGN_KEY_CHECKS = 0")
+            
+            # Drop all tables
+            cursor.execute("DROP TABLE IF EXISTS csv_export_history")
+            cursor.execute("DROP TABLE IF EXISTS order_credits")
+            cursor.execute("DROP TABLE IF EXISTS order_addresses")
+            cursor.execute("DROP TABLE IF EXISTS order_items")
+            cursor.execute("DROP TABLE IF EXISTS orders")
+            cursor.execute("DROP TABLE IF EXISTS sync_history")
+            cursor.execute("DROP TABLE IF EXISTS stock_sync_history")
+            cursor.execute("DROP TABLE IF EXISTS product_mapping")
+            
+            # Re-enable foreign key checks
+            cursor.execute("SET FOREIGN_KEY_CHECKS = 1")
+            
+            self.connection.commit()
+            print("All tables dropped successfully")
+            
+        except Error as e:
+            print(f"Error dropping tables: {e}")
+            self.connection.rollback()
+

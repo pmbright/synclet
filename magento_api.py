@@ -133,3 +133,55 @@ class MagentoAPI:
         except Exception as e:
             print(f"Connection test failed: {e}")
             return False
+    
+    def update_stock(self, stock_updates):
+        """
+        Update stock levels in Magento
+        
+        Args:
+            stock_updates: List of dictionaries with keys:
+                - StockUpdateId: Unique ID for this update
+                - ProductCode: Product SKU
+                - StockAtHand: Total stock quantity
+                - StockAllocated: Allocated stock quantity
+                - StockAvailable: Available stock quantity
+                
+        Returns:
+            bool: Success status
+        """
+        # Build URL with action parameter
+        params = {
+            'AccessKey': self.access_key,
+            'Action': 'updateStock'
+        }
+        
+        url = f"{self.base_url}?{urlencode(params)}"
+        
+        try:
+            # Prepare the data
+            data = {
+                'updates': stock_updates
+            }
+            
+            print(f"Updating stock for {len(stock_updates)} products...")
+            
+            response = requests.post(
+                url,
+                json=data,
+                headers={'Content-Type': 'application/json'},
+                timeout=30
+            )
+            
+            response.raise_for_status()
+            
+            result = response.json()
+            print(f"Stock update response: {result}")
+            
+            return True
+            
+        except requests.exceptions.RequestException as e:
+            print(f"Error updating stock in Magento: {e}")
+            return False
+        except Exception as e:
+            print(f"Unexpected error updating stock: {e}")
+            return False

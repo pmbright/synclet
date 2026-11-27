@@ -5,7 +5,7 @@
 CREATE DATABASE IF NOT EXISTS synclet_test CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
 
 -- Create user if not exists (MySQL 5.7+ syntax)
-CREATE USER IF NOT EXISTS 'synclet_test'@'localhost' IDENTIFIED BY 'Bingo-Shrubbery-Crushing-428';
+CREATE USER IF NOT EXISTS 'synclet_test'@'localhost' IDENTIFIED BY 'CHANGE_ME_BEFORE_RUNNING';
 
 -- Grant all privileges on the database
 GRANT ALL PRIVILEGES ON synclet_test.* TO 'synclet_test'@'localhost';
