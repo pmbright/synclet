@@ -7,11 +7,14 @@ from pathlib import Path
 import requests
 from dotenv import load_dotenv
 
-load_dotenv()
+APP_DIR = Path(__file__).resolve().parent
+load_dotenv(APP_DIR / ".env")
 
 TOKEN_URL = "https://oauth.platform.intuit.com/oauth2/v1/tokens/bearer"
 
 TOKEN_FILE = Path(os.getenv("QBO_TOKEN_FILE", "qbo_tokens.json"))
+if not TOKEN_FILE.is_absolute():
+    TOKEN_FILE = APP_DIR / TOKEN_FILE
 
 QBO_CLIENT_ID = os.environ["QBO_CLIENT_ID"]
 QBO_CLIENT_SECRET = os.environ["QBO_CLIENT_SECRET"]
